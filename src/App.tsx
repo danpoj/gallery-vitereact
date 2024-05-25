@@ -14,33 +14,35 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { db } from '@/db/drizzle';
-import { postTable } from '@/db/schema';
 import { cn } from '@/lib/utils';
 import { shimmer } from '@/shimmer';
-import { faker } from '@faker-js/faker';
-import { desc } from 'drizzle-orm';
-import Image from 'next/image';
-import { redirect } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-const limit = 15;
+type Post = {
+  id: string;
+  username: string;
+  email: string;
+  avatar: string;
+  createdAt: string;
+  image: string;
+};
 
-export default function App({
-  searchParams: { page },
-}: {
-  searchParams: { page?: string | string[] };
-}) {
-  if (Array.isArray(page)) redirect('/');
+const apiURL = import.meta.env.VITE_API as string;
 
-  const pageNumber =
-    page && !isNaN(parseInt(page)) && parseInt(page) > 0 ? parseInt(page) : 1;
+export default function App() {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [pageNumber, setPageNumber] = useState(1);
 
-  const posts = await db
-    .select()
-    .from(postTable)
-    .orderBy(desc(postTable.createdAt))
-    .limit(limit)
-    .offset((pageNumber - 1) * limit);
+  useEffect(() => {
+    (async () => {
+      const response = await fetch(`${apiURL}/posts?page=${pageNumber}`);
+
+      if (!response.ok) throw new Error('X');
+
+      const fetchedPosts = (await response.json()) as Post[];
+      setPosts(fetchedPosts);
+    })();
+  }, [pageNumber]);
 
   return (
     <main className={cn('w-screen h-screen p-4 2')}>
@@ -50,22 +52,24 @@ export default function App({
             <PaginationItem>
               <PaginationPrevious
                 aria-disabled={pageNumber <= 1}
-                href={`?page=${pageNumber - 1}`}
+                to={`?page=${pageNumber - 1}`}
                 tabIndex={pageNumber <= 1 ? -1 : undefined}
                 className={
                   pageNumber <= 1 ? 'pointer-events-none opacity-50' : undefined
                 }
+                onClick={() => setPageNumber(pageNumber - 1)}
               />
             </PaginationItem>
             <PaginationItem>
-              <PaginationLink href='#' isActive>
+              <PaginationLink to='#' isActive>
                 {pageNumber}
               </PaginationLink>
             </PaginationItem>
             <PaginationItem>
               <PaginationNext
+                onClick={() => setPageNumber(pageNumber + 1)}
                 aria-disabled={posts.length === 0}
-                href={`?page=${pageNumber + 1}`}
+                to={`?page=${pageNumber + 1}`}
                 tabIndex={posts.length === 0 ? -1 : undefined}
                 className={
                   posts.length === 0
@@ -80,7 +84,7 @@ export default function App({
 
       {posts.length === 0 && (
         <p className='text-3xl flex items-center justify-center w-full font-thin'>
-          no posts.
+          ...
         </p>
       )}
 
@@ -95,8 +99,7 @@ export default function App({
                     shimmer
                   )}
                 >
-                  <Image
-                    unoptimized
+                  <img
                     src={post.avatar}
                     width={60}
                     height={60}
@@ -121,16 +124,4 @@ export default function App({
       </section>
     </main>
   );
-}
-
-function createRandomUser() {
-  return {
-    userId: faker.string.uuid(),
-    username: faker.internet.userName(),
-    email: faker.internet.email(),
-    avatar: faker.image.avatar(),
-    password: faker.internet.password(),
-    createdAt: faker.date.past(),
-    image: faker.image.url(),
-  };
 }
